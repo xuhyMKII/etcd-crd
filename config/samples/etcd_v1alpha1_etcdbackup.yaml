@@ -1,0 +1,9 @@
+apiVersion: etcd.improbable.io/v1alpha1
+kind: EtcdBackup
+metadata:
+  name: etcdbackup-sample
+spec:
+  source:
+    clusterURL: http://my-cluster:2379
+  destination:
+    objectURL: "s3://foo-bucket/snapshot.db"

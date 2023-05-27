@@ -1,0 +1,44 @@
+syntax = "proto3";
+
+package proxy.v1;
+
+
+//    这个文件定义了一个gRPC服务，它允许客户端通过代理与Etcd集群进行通信。
+//    这个服务主要用于在Etcd集群和客户端之间建立通信，客户端可以是任何需要与Etcd集群交互的服务。
+//    这个项目部署的etcd确实是server端，
+//    grpc的协议文件存在的意义就是用来让以crd方式部署在集群中的etcd server响应外部client的请求的。
+
+
+service ProxyService {
+    // Upload will store a backup file in cloud storage
+    rpc Upload (UploadRequest) returns (UploadResponse) {}
+    // Download will retrieve a backup file from cloud storage
+    rpc Download (DownloadRequest) returns (DownloadResponse) {}
+}
+
+message UploadRequest {
+    // This is the URL of the backup to upload.
+    string backup_url = 1;
+
+    // This is the binary contents of the backup itself. This is the same as what would be placed on-disk if using
+    // `etcdctl snapshot save`.
+    bytes backup = 3;
+}
+
+message UploadResponse {
+    // This is the full URL of the backup in remote storage. The structure of this URL is entirely determined by the
+    // proxy and may change from backup to backup, users should not attempt to parse data out of the URL.
+    string backup_url = 1;
+}
+
+message DownloadRequest {
+    // This is the URL of the backup to download. If downloading a previously uploaded backup, use the URL returned from
+    // the Upload.
+    string backup_url = 1;
+}
+
+message DownloadResponse {
+    // This is the binary contents of the backup itself. This is the same as what would be placed on-disk if using
+    // `etcdctl snapshot save`.
+    bytes backup = 1;
+}

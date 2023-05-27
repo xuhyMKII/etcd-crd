@@ -1,0 +1,80 @@
+# Golang CircleCI 2.0 configuration file
+#
+# Check the following links for more details:
+# * https://circleci.com/docs/2.0/language-go/
+# * https://circleci.com/docs/2.0/circleci-images/#next-gen-circleci-go-image
+version: 2
+jobs:
+  verify:
+    machine:
+      image: ubuntu-1604:201903-01
+    steps:
+      - run:
+          name: Install Go
+          command: |
+            sudo rm -rf /usr/local/go
+            curl -sSL "https://dl.google.com/go/go1.14.linux-amd64.tar.gz" -o /tmp/go.tar.gz
+            echo "08df79b46b0adf498ea9f320a0f23d6ec59e9003660b4c9c1ce8e5e2c6f823ca  /tmp/go.tar.gz" | sha256sum -c
+            sudo tar -xzf /tmp/go.tar.gz -C /usr/local/
+            echo "export PATH=$PATH:/usr/local/go/bin" >> $BASH_ENV
+            echo 'export GOPATH=$HOME/go' >> $BASH_ENV
+      - checkout
+      - run:
+         name: Static checks
+         command: make verify
+  test:
+    docker:
+      - image: cimg/go:1.14
+    steps:
+      - checkout
+      - run:
+         name: Unit tests
+         command: make test
+  e2e:
+    machine:
+      image: ubuntu-1604:201903-01
+    working_directory: ~/go/src/github.com/improbable-eng/etcd-cluster-operator
+    steps:
+      - run:
+          name: Install Go
+          command: |
+            sudo rm -rf /usr/local/go
+            curl -sSL "https://dl.google.com/go/go1.14.linux-amd64.tar.gz" -o /tmp/go.tar.gz
+            echo "08df79b46b0adf498ea9f320a0f23d6ec59e9003660b4c9c1ce8e5e2c6f823ca  /tmp/go.tar.gz" | sha256sum -c
+            sudo tar -xzf /tmp/go.tar.gz -C /usr/local/
+            echo "export PATH=$PATH:/usr/local/go/bin" >> $BASH_ENV
+            echo 'export GOPATH=$HOME/go' >> $BASH_ENV
+      - run:
+          name: Install kubectl
+          command: |
+            # Download & verify kubectl
+            curl -LO https://storage.googleapis.com/kubernetes-release/release/v1.16.2/bin/linux/amd64/kubectl
+            echo "3ff48e12f9c768ad548e4221d805281ea28dfcda5c18b3cd1797fe37aee3012e  kubectl" | sha256sum -c
+            # Mark it executable & move to /bin
+            sudo chmod +x ./kubectl
+            sudo mv ./kubectl /usr/local/bin
+      - run:
+          name: Install kustomize
+          command: |
+            curl -L -o /tmp/kustomize.tar.gz https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize/v3.5.4/kustomize_v3.5.4_linux_amd64.tar.gz
+            echo "5cdeb2af81090ad428e3a94b39779b3e477e2bc946be1fe28714d1ca28502f6a  /tmp/kustomize.tar.gz" | sha256sum -c
+            sudo tar -C /usr/local/bin -x -f /tmp/kustomize.tar.gz
+      - checkout
+      - run:
+         name: End to end tests
+         # Limit parallelism of E2E tests to avoid overloading the CircleCI
+         command: make e2e-kind TEST_PARALLEL_E2E=1 E2E_ARTIFACTS_DIRECTORY=/tmp/etcd-e2e
+      - run:
+         name: Export Logs
+         command: make kind-export-logs E2E_ARTIFACTS_DIRECTORY=/tmp/etcd-e2e
+         when: always
+      - store_artifacts:
+          path: /tmp/etcd-e2e
+
+workflows:
+  version: 2
+  build_and_test:
+    jobs:
+      - verify
+      - test
+      - e2e
